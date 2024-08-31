@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messages</title>
+    <link rel="stylesheet" href="/stylesheets/message.css">
+</head>
+<body>
+    <!-- Header section with back button -->
+    <header>
+        <div class="header-container">
+            <a href="/feed" class="back-button">Back</a>
+            <h1>Messages</h1>
+        </div>
+    </header>
+
+    <!-- Messages UI Container -->
+    <div class="messages-ui">
+        <!-- User List -->
+        <div class="user-list">
+            <h2>Chats</h2>
+            <% users.forEach(user => { %>
+                <div class="user-item">
+                    <a href="/messages/<%= user._id %>">
+                        <img src="/images/uploads/<%=user.picture %>" alt="" class="user-avatar">
+                        <span><%= user.username %></span>
+                    </a>
+                </div>
+            <% }) %>
+        </div>
+
+        <!-- Chat Box -->
+        <div class="chat-box">
+            <% if (selectedUser) { %>
+                <h2>Chat with <%= selectedUser.username %></h2>
+                
+                <!-- Chat History -->
+                <div class="chat-history">
+                    <% messages.forEach(msg => { %>
+                        <div class="<%= msg.sender.equals(user._id) ? 'message-sent' : 'message-received' %>">
+                            <p><%= msg.message %></p>
+                            <!-- <small><%= new Date(msg.timestamp).toLocaleString() %></small> -->
+                        </div>
+                    <% }) %>
+                </div>
+
+                <!-- Message Input Form -->
+                <form action="/messages/<%= selectedUser ? selectedUser._id : '' %>" method="post" id="message-form" class="message-form">
+                    <input type="text" id="message-input" name="message" placeholder="Type a message..." required>
+                    <button type="submit">Send</button>
+                </form>
+            <% } else { %>
+                <h2>Select a user to start chatting</h2>
+            <% } %>
+        </div>
+    </div>
+
+    <!-- Include Socket.IO client -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+    
+        // Ensure 'user' is defined and available
+        const userId = '<%= user._id %>';
+        const selectedUserId = '<%= selectedUser ? selectedUser._id : '' %>';
+    
+        // Join a room based on user ID
+        socket.emit('joinRoom', userId);
+    
+        // Handle form submission for sending a message
+        const form = document.getElementById('message-form');
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const messageInput = document.getElementById('message-input');
+            const message = messageInput.value;
+    
+            if (selectedUserId && message.trim() !== '') {
+                const timestamp = new Date().toISOString(); // Use ISO string format for consistency
+                // Emit the message to the server via Socket.IO
+                socket.emit('sendMessage', {
+                    sender: userId,
+                    receiver: selectedUserId,
+                    message: message,
+                    timestamp: timestamp
+                });
+    
+                // Append the message to the chat history immediately
+                appendMessage({
+                    sender: userId,
+                    message: message,
+                    timestamp: timestamp
+                }, 'message-sent');
+    
+                // Clear the input field
+                messageInput.value = '';
+            }
+        });
+    
+        // Handle receiving a message in real-time
+        socket.on('receiveMessage', (data) => {
+            if (data.receiver === userId || data.sender === userId) {
+                appendMessage(data, data.sender === userId ? 'message-sent' : 'message-received');
+            }
+        });
+    
+        // Function to append a message to the chat history
+        function appendMessage(data, className) {
+            const chatHistory = document.querySelector('.chat-history');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = className;
+            messageDiv.innerHTML = `
+                <p>${data.message}</p>
+                <small>${new Date(data.timestamp).toLocaleString()}</small>
+            `;
+            chatHistory.appendChild(messageDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;  // Scroll to bottom
+        }
+    </script>
+    
+
+</body>
+</html>
